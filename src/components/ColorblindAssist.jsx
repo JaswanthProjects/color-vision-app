@@ -78,6 +78,10 @@ export default function ColorblindAssist({ image, onBack }) {
     setActiveFilter(filterId);
   }, []);
 
+  const handleFilterSelection = useCallback((filterId) => {
+    applyFilter(activeFilter === filterId ? "none" : filterId);
+  }, [activeFilter, applyFilter]);
+
   const getFilterInfo = (filterId) => {
     return FILTER_OPTIONS.find(f => f.id === filterId);
   };
@@ -126,12 +130,6 @@ export default function ColorblindAssist({ image, onBack }) {
         <div className="flex items-center gap-3 px-5 py-2.5 bg-purple-500/10 border border-purple-500/30 rounded-full animate-in fade-in zoom-in duration-300 shadow-lg shadow-purple-500/10">
           {renderIcon(getFilterInfo(activeFilter))}
           <span className="text-purple-300 font-medium">{getFilterInfo(activeFilter)?.name}</span>
-          <button 
-            onClick={() => applyFilter("none")}
-            className="ml-2 text-purple-400 hover:text-slate-100 transition-colors p-1 hover:bg-purple-500/20 rounded-full"
-          >
-            <RotateCcw className="w-4 h-4" />
-          </button>
         </div>
       )}
 
@@ -165,7 +163,7 @@ export default function ColorblindAssist({ image, onBack }) {
               {FILTER_OPTIONS.filter(f => f.category === "assist").map(filter => (
                 <button
                   key={filter.id}
-                  onClick={() => applyFilter(filter.id)}
+                  onClick={() => handleFilterSelection(filter.id)}
                   className={`flex flex-col items-center gap-3 p-5 rounded-2xl transition-all duration-300 border ${
                     activeFilter === filter.id
                       ? "bg-green-500/20 border-green-500/40 text-white scale-105 shadow-xl shadow-green-500/10"
@@ -193,7 +191,7 @@ export default function ColorblindAssist({ image, onBack }) {
               {FILTER_OPTIONS.filter(f => f.category === "enhance").map(filter => (
                 <button
                   key={filter.id}
-                  onClick={() => applyFilter(filter.id)}
+                  onClick={() => handleFilterSelection(filter.id)}
                   className={`flex items-center gap-3 px-4 py-4 rounded-2xl transition-all duration-300 border ${
                     activeFilter === filter.id
                       ? "bg-blue-500/20 border-blue-500/40 text-white shadow-xl shadow-blue-500/10"
@@ -219,7 +217,7 @@ export default function ColorblindAssist({ image, onBack }) {
               {FILTER_OPTIONS.filter(f => f.category === "simulate").map(filter => (
                 <button
                   key={filter.id}
-                  onClick={() => applyFilter(filter.id)}
+                  onClick={() => handleFilterSelection(filter.id)}
                   className={`flex flex-col sm:flex-row items-center justify-center gap-3 px-4 py-4 rounded-2xl transition-all duration-300 border ${
                     activeFilter === filter.id
                       ? "bg-yellow-500/20 border-yellow-500/40 text-white shadow-xl shadow-yellow-500/10"
