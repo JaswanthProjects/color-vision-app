@@ -1,8 +1,12 @@
 export const AI_ASSIST_PROVIDER = "Google Gemini";
 
+// Actions that need longer, more detailed AI responses (higher token limits and sentence counts).
+// Previously included both 'show-repaired-version' and 'switch-low-vision-mode' as separate entries,
+// but they were merged into a single 'repair-and-adapt' action since they covered overlapping ground.
 export const EXTENDED_DEEP_ACTION_IDS = new Set([
-  "show-repaired-version",
-  "switch-low-vision-mode",
+  "repair-and-adapt",
+  "highlight-danger-zones",
+  "check-accessibility",
 ]);
 
 export const AI_ASSIST_ACTIONS = [
@@ -22,7 +26,7 @@ export const AI_ASSIST_ACTIONS = [
     tone: "emerald",
     modelTier: "deep",
     prompt:
-      "Review this image for accessibility concerns. Focus on contrast issues, text readability, visual clutter, reliance on color alone, and anything that may be hard to notice for low-vision or colorblind users. Reply in plain text only with one natural paragraph of 4 to 6 sentences, about 95 to 140 words. Mention the biggest risks and the simplest fixes. Do not use markdown, bullets, headings, asterisks, or hashtags.",
+      "Review this image for accessibility concerns. Focus on contrast issues, text readability, visual clutter, reliance on color alone, and anything that may be hard to notice for low-vision or colorblind users. Reply in plain text only with one natural paragraph of 5 to 7 sentences, about 130 to 190 words. Mention the biggest risks, the simplest fixes, and why each matters for accessibility. Do not use markdown, bullets, headings, asterisks, or hashtags.",
   },
   {
     id: "read-dominant-colors",
@@ -33,23 +37,16 @@ export const AI_ASSIST_ACTIONS = [
     prompt:
       "Identify the dominant visible colors in this image and describe where they appear. Prefer plain-language color names over technical codes. Reply in plain text only with 3 to 4 natural sentences, about 60 to 95 words. Do not use markdown, bullets, headings, asterisks, or hashtags.",
   },
+  // Previously two separate actions ('Show Repaired Version' and 'Switch to Low Vision Mode').
+  // They were merged into one because both dealt with suggesting visual improvements for accessibility.
   {
-    id: "show-repaired-version",
-    title: "Show Repaired Version",
-    description: "Explain how the image could be improved for clarity.",
+    id: "repair-and-adapt",
+    title: "Repair & Adapt",
+    description: "Suggest repairs and low-vision adjustments for the image.",
     tone: "amber",
     modelTier: "deep",
     prompt:
-      "This app is text-only for this action right now. Describe how you would repair or enhance this image for better visibility and accessibility. Mention specific edits a future tool or human could apply, such as contrast tuning, color remapping, sharpening, decluttering, or emphasis changes. Reply in plain text only with 5 to 7 natural sentences, about 130 to 190 words. Be specific about what should change and why it would help. Do not use markdown, bullets, headings, asterisks, or hashtags.",
-  },
-  {
-    id: "switch-low-vision-mode",
-    title: "Switch to Low Vision Mode",
-    description: "Suggest low-vision-friendly adjustments for the image.",
-    tone: "cyan",
-    modelTier: "deep",
-    prompt:
-      "Explain how this image should be adapted for a low-vision-friendly mode. Focus on stronger contrast, enlargement, edge emphasis, spacing, focus guidance, and reducing distracting detail. Reply in plain text only with 5 to 7 natural sentences, about 130 to 190 words. Be specific about what the viewer should see more clearly after the changes. Do not use markdown, bullets, headings, asterisks, or hashtags.",
+      "Describe how this image could be repaired and adapted for better visibility and low-vision accessibility. Cover specific improvements such as contrast tuning, color remapping, sharpening, decluttering, edge emphasis, enlargement, spacing, focus guidance, and reducing distracting detail. Explain what changes would help and what the viewer should see more clearly after those changes are applied. Reply in plain text only with 5 to 7 natural sentences, about 130 to 190 words. Be specific about what should change and why. Do not use markdown, bullets, headings, asterisks, or hashtags.",
   },
   {
     id: "highlight-danger-zones",
@@ -58,27 +55,40 @@ export const AI_ASSIST_ACTIONS = [
     tone: "rose",
     modelTier: "deep",
     prompt:
-      "Identify the areas in this image that may be visually risky or hard to notice, such as low-contrast regions, dense fine detail, glare, blended colors, or misleading emphasis. Reply in plain text only with 4 to 6 natural sentences, about 95 to 140 words. Describe where the biggest issues appear and why they matter. Do not use markdown, bullets, headings, asterisks, or hashtags.",
+      "Identify the areas in this image that may be visually risky or hard to notice, such as low-contrast regions, dense fine detail, glare, blended colors, or misleading emphasis. Reply in plain text only with 5 to 7 natural sentences, about 130 to 190 words. Describe where the biggest issues appear, why they matter, and what could be done to reduce the risk. Do not use markdown, bullets, headings, asterisks, or hashtags.",
   },
 ];
 
+// Helper function to find a specific AI Assist action by its unique ID.
+// This is used across the app to look up the prompt, tone, and model tier for a chosen action.
 export function getAIAssistAction(actionId) {
+  // We use .find() to locate the action object in the AI_ASSIST_ACTIONS array.
+  // If no action matches the provided ID, we return null as a fallback.
   return AI_ASSIST_ACTIONS.find((action) => action.id === actionId) ?? null;
 }
 
+// Utility to safely extract and clean up environment variables.
+// It checks if the provided 'envSource' exists and safely accesses the 'key'.
 function readEnvValue(envSource, key) {
   const value = envSource?.[key];
 
+  // If the value is a valid string, we trim whitespace to avoid subtle bugs.
+  // Otherwise, we return an empty string to ensure a predictable type.
   return typeof value === "string" ? value.trim() : "";
 }
 
+// Determines the correct Gemini model to use based on the action's tier ('fast' or 'deep').
+// It reads from the provided environment variables, allowing flexibility for both local and server environments.
 export function resolveGeminiModelForTier(envSource, modelTier) {
+  // First, check if there's a global override model set for all tiers (e.g., VITE_GEMINI_MODEL).
   const sharedOverride =
     readEnvValue(envSource, "VITE_GEMINI_MODEL") || readEnvValue(envSource, "GEMINI_MODEL");
   if (sharedOverride) {
-    return sharedOverride;
+    return sharedOverride; // Apply the override universally if it exists.
   }
 
+  // If no override exists, resolve the specific models for the 'fast' and 'deep' tiers.
+  // We fall back to standard defaults if specific tier overrides aren't provided.
   const fastModel =
     readEnvValue(envSource, "VITE_GEMINI_FAST_MODEL") ||
     readEnvValue(envSource, "GEMINI_FAST_MODEL") ||
@@ -88,9 +98,14 @@ export function resolveGeminiModelForTier(envSource, modelTier) {
     readEnvValue(envSource, "GEMINI_DEEP_MODEL") ||
     "gemini-3-flash-preview";
 
+  // Return the deep model if the action requires more complex reasoning ('deep'),
+  // otherwise return the fast model which provides quicker responses.
   return modelTier === "deep" ? deepModel : fastModel;
 }
 
+// Convenience wrapper around resolveGeminiModelForTier that defaults to import.meta.env.
+// This is primarily used in the frontend code running on the client side.
 export function getGeminiModelForTier(modelTier) {
+  // import.meta.env contains Vite's injected environment variables.
   return resolveGeminiModelForTier(import.meta.env ?? {}, modelTier);
 }

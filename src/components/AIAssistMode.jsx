@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+// Import various icons from lucide-react to represent the different actions visually.
 import {
   AlertTriangle,
   ArrowLeft,
-  Eye,
   Loader2,
   Palette,
   Shield,
@@ -12,7 +12,10 @@ import {
   Wrench,
 } from "lucide-react";
 
+// Pull in our configuration array (which holds Prompts/Tones/Titles) 
+// and the helper to determine which model is running.
 import { AI_ASSIST_ACTIONS, getGeminiModelForTier } from "../utils/aiAssistConfig";
+// Import the core runner that decides whether to hit /api or google APIs directly.
 import { runGeminiVisionAction } from "../utils/geminiVision";
 
 const TONE_STYLES = {
@@ -54,6 +57,9 @@ const TONE_STYLES = {
   },
 };
 
+// Returns a specific Lucide Icon based on the string actionId.
+// This allows us to keep the config array pure serializable JS (for the node backend)
+// while letting the React frontend pair those pure configurations with React components.
 function getActionIcon(actionId) {
   switch (actionId) {
     case "describe-image":
@@ -62,10 +68,9 @@ function getActionIcon(actionId) {
       return Shield;
     case "read-dominant-colors":
       return Palette;
-    case "show-repaired-version":
+    // Combined action merging the old 'Show Repaired Version' and 'Switch to Low Vision Mode'
+    case "repair-and-adapt":
       return Wrench;
-    case "switch-low-vision-mode":
-      return Eye;
     case "highlight-danger-zones":
       return AlertTriangle;
     default:
@@ -88,14 +93,26 @@ function getStatusLabel(status) {
   }
 }
 
+// Main component representing the AI Assist feature panel.
+// Takes 'image' (a base64 data string captured from video/camera) and 'onBack' (a callback to return).
 export default function AIAssistMode({ image, onBack }) {
+  // Use a ref to strictly track if the component unmounts mid-request, saving us from React state warnings.
   const isMountedRef = useRef(true);
+  
+  // A monotonic ID counter that helps us ignore "stale" requests if the user clicks two different buttons fast.
   const requestIdRef = useRef(0);
+
+  // We keep a reference to the active Text-to-Speech Utterance so we can cancel it later.
   const utteranceRef = useRef(null);
+
+  // Allows aggressively cancelling a fetch command if the user leaves the page or clicks another action.
   const abortControllerRef = useRef(null);
   const requestTimeoutRef = useRef(null);
 
+  // Tracks which action was clicked last so we can highlight it.
   const [activeActionId, setActiveActionId] = useState(null);
+  
+  // Central state holding exactly what string Google Gemini returned, its status, and the model that responded.
   const [resultState, setResultState] = useState({
     status: "idle",
     title: "AI Assist Ready",
@@ -103,6 +120,8 @@ export default function AIAssistMode({ image, onBack }) {
     provider: "Google Gemini",
     model: null,
   });
+
+  // Track if text-to-speech is currently playing so we can toggle the 'Stop/Play' icon.
   const [isSpeaking, setIsSpeaking] = useState(false);
 
   const supportsSpeech =
@@ -127,32 +146,41 @@ export default function AIAssistMode({ image, onBack }) {
     };
   }, [supportsSpeech]);
 
+  // A helper that attempts to forcibly silence any active Text-to-Speech readings out loud.
   function stopSpeaking() {
     if (!supportsSpeech) {
       return;
     }
 
+    // Cancel native SpeechSynthesis queue entirely.
     window.speechSynthesis.cancel();
     utteranceRef.current = null;
     setIsSpeaking(false);
   }
 
+  // Toggles the loud reading of the returned AI text.
   function handleVoiceToggle() {
     if (!supportsSpeech || !resultState.text) {
       return;
     }
 
+    // If we're already speaking, clicking it again causes it to stop completely.
     if (isSpeaking) {
       stopSpeaking();
       return;
     }
 
-    stopSpeaking();
+    stopSpeaking(); // Failsafe clearing out any dangling native OS speech queues on mobile.
 
+    // Format the AI text for speech engine. Removes multiple newlines that make synthesizers pause too long.
     const speechText = resultState.text.replace(/\n+/g, " ").replace(/\s{2,}/g, " ").trim();
+    
+    // Construct the browser native Speech Synthesis object.
     const utterance = new SpeechSynthesisUtterance(speechText);
-    utterance.rate = 1;
-    utterance.pitch = 1;
+    utterance.rate = 1;  // Normal speed
+    utterance.pitch = 1; // Normal pitch
+
+    // Detect when the OS finishes speaking so we can revert our UI 'Stop Voice' button back to 'Play Voice'.
     utterance.onend = () => {
       if (utteranceRef.current === utterance) {
         utteranceRef.current = null;
@@ -166,15 +194,20 @@ export default function AIAssistMode({ image, onBack }) {
       }
     };
 
+    // Stash the ref to prevent garbage collection weirdness on Safari, then trigger speak queue.
     utteranceRef.current = utterance;
     setIsSpeaking(true);
     window.speechSynthesis.speak(utterance);
   }
 
+  // Fired when the user clicks one of the Action Cards on the left panel.
+  // We handle canceling existing fetches, setting up timeouts, and executing the API logic.
   async function handleActionClick(action) {
+    // Generate a new request ID. Useful if user rapidly clicks two buttons, we only honor the latest.
     const nextRequestId = requestIdRef.current + 1;
     requestIdRef.current = nextRequestId;
 
+    // Immediately kill any currently flying request if they click a new button before it finished.
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -182,13 +215,16 @@ export default function AIAssistMode({ image, onBack }) {
       window.clearTimeout(requestTimeoutRef.current);
     }
 
+    // Set up standard JS fetch abort controllers for timeout and cancellation.
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
     requestTimeoutRef.current = window.setTimeout(() => {
-      abortController.abort();
+      abortController.abort(); // Hard timeout of 25 seconds for Vercel Hobby limits
     }, 25000);
 
+    // Mute any old result currently being spoken out load
     stopSpeaking();
+    // Update UI immediately to show spinner logic
     setActiveActionId(action.id);
     setResultState({
       status: "loading",
@@ -199,12 +235,14 @@ export default function AIAssistMode({ image, onBack }) {
     });
 
     try {
+      // **EXECUTE CENTRAL LOGIC** calls out to geminiVision wrapper passing the huge base64 `image`.
       const nextResult = await runGeminiVisionAction({
         actionId: action.id,
         imageDataUrl: image,
         signal: abortController.signal,
       });
 
+      // Ignore if component unmounted or if the user clicked another action which bumped our generic counter ID.
       if (!isMountedRef.current || requestIdRef.current !== nextRequestId) {
         return;
       }
@@ -215,6 +253,7 @@ export default function AIAssistMode({ image, onBack }) {
         return;
       }
 
+      // If our own abort interval fired the abort command, catch it cleanly and show friendly message.
       if (error instanceof Error && error.name === "AbortError") {
         setResultState({
           status: "error",
@@ -226,6 +265,7 @@ export default function AIAssistMode({ image, onBack }) {
         return;
       }
 
+      // Final generic catch block for unpredictable app / fetch failures.
       setResultState({
         status: "error",
         title: action.title,
@@ -237,6 +277,7 @@ export default function AIAssistMode({ image, onBack }) {
         model: getGeminiModelForTier(action.modelTier),
       });
     } finally {
+      // Regardless of success, abort, or failure, purge these timeouts when done to prevent mem-leaks and state corruption.
       if (requestTimeoutRef.current) {
         window.clearTimeout(requestTimeoutRef.current);
         requestTimeoutRef.current = null;
