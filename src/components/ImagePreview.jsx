@@ -1,10 +1,11 @@
-import { Wand2, Eye, RefreshCcw } from "lucide-react";
+import { Wand2, Eye, RefreshCcw, Sparkles } from "lucide-react";
 
 // This component shows the photo you just took
 // and asks what you want to do with it.
 export default function ImagePreview({ 
   image,              // The photo data
   onAnalyze,          // Function to run when clicking "Analyze Colors"
+  onAIAssist,         // Function to run when clicking "AI Assist"
   onColorblindAssist, // Function to run when clicking "Colorblind Assist"
   onRetake            // Function to run when clicking "Retake Photo"
 }) {
@@ -24,7 +25,7 @@ export default function ImagePreview({
         />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-lg">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full max-w-4xl">
         <button
           onClick={onAnalyze}
           className="glass-button flex flex-col items-center gap-3 bg-green-500/10 hover:bg-green-500/20 border-green-500/20 px-6 py-6 rounded-3xl group"
@@ -48,6 +49,19 @@ export default function ImagePreview({
           <div className="flex flex-col items-center text-center">
             <span className="text-lg font-semibold text-white/90">Colorblind Assist</span>
             <span className="text-xs text-gray-400 mt-1">Enhance colors for visibility</span>
+          </div>
+        </button>
+
+        <button
+          onClick={onAIAssist}
+          className="glass-button flex flex-col items-center gap-3 bg-cyan-500/10 hover:bg-cyan-500/20 border-cyan-500/20 px-6 py-6 rounded-3xl group"
+        >
+          <div className="p-3 bg-cyan-500/20 text-cyan-300 rounded-xl group-hover:scale-110 transition-transform duration-300">
+            <Sparkles className="w-7 h-7" />
+          </div>
+          <div className="flex flex-col items-center text-center">
+            <span className="text-lg font-semibold text-white/90">AI Assist</span>
+            <span className="text-xs text-gray-400 mt-1">Describe and review the image with AI</span>
           </div>
         </button>
       </div>

@@ -5,6 +5,7 @@ import CameraView from "./components/CameraView";
 import ImagePreview from "./components/ImagePreview";
 import AnalysisMode from "./components/AnalysisMode";
 import ColorblindAssist from "./components/ColorblindAssist";
+import AIAssistMode from "./components/AIAssistMode";
 
 function App() {
   const [capturedImage, setCapturedImage] = useState(null);
@@ -89,6 +90,7 @@ function App() {
         <ImagePreview
           image={capturedImage}
           onAnalyze={() => setMode("analysis")}
+          onAIAssist={() => setMode("aiAssist")}
           onColorblindAssist={() => setMode("colorblind")}
           onRetake={() => setMode("camera")}
         />
@@ -104,6 +106,13 @@ function App() {
       {mode === "colorblind" && (
         <ColorblindAssist 
           image={capturedImage} 
+          onBack={() => setMode("preview")}
+        />
+      )}
+
+      {mode === "aiAssist" && (
+        <AIAssistMode
+          image={capturedImage}
           onBack={() => setMode("preview")}
         />
       )}
