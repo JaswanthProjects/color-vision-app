@@ -5,7 +5,7 @@ import {
 } from "./aiAssistConfig";
 
 // This function proxies the request to our secure Vercel Edge backend (api/gemini-vision.js).
-// It acts as a safety bridge so we avoid exposing the GEMINI_API_KEY directly in the client bundle.
+// It acts as a safety bridge so provider credentials never enter the client bundle.
 async function requestServerResponse({ action, imageDataUrl, signal }) {
   // Post against our own domain serverless endpoint.
   const response = await fetch("/api/gemini-vision", {
@@ -67,3 +67,4 @@ export async function runGeminiVisionAction({ actionId, imageDataUrl, signal }) 
 
   return requestServerResponse({ action, imageDataUrl, signal });
 }
+
