@@ -12,7 +12,7 @@ function getMissingKeyResult(action) {
   return {
     status: "missing-key",
     title: action.title,
-    text: "AI assist API is not configured right now.",
+    text: "AI assist is disabled right now.",
     provider: AI_ASSIST_PROVIDER,
     model: null,
   };
